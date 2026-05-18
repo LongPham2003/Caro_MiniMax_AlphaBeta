@@ -1,4 +1,3 @@
-import turtle
 
 global move_history, game_mode, turn, in_menu, painter, size_board
 
@@ -35,7 +34,6 @@ def is_win(board):
     return 'Continue playing'
 
 
-## AI Engine
 
 def march(board, y, x, dy, dx, length):
     curr_y, curr_x = y, x

@@ -1,6 +1,7 @@
 from MiniMax_AlphaBeta import is_in, is_win, best_move, make_empty_board
 import turtle
 
+# Vẽ các button
 def draw_button(t, x1, y1, x2, y2, text, fill_color):
     """Vẽ một nút bấm hình chữ nhật có văn bản ở giữa"""
     t.penup()
@@ -15,20 +16,20 @@ def draw_button(t, x1, y1, x2, y2, text, fill_color):
     t.end_fill()
     t.penup()
 
-    # Ghi chữ vào giữa nút
-    t.goto((x1 + x2) / 2, (y1 + y2) / 2 + 0.2)
+    # Ghi chữ vào giữa nút (Căn chỉnh lại trục Y để chữ không bị lệch)
+    t.goto((x1 + x2) / 2, (y1 + y2) / 2 + 0.3)
     t.color("#ffffff")
     t.write(text, align="center", font=("Arial", 13, "bold"))
 
-
+# Vẽ menu
 def draw_menu():
-    """Vẽ toàn bộ giao diện Menu chính lên màn hình"""
+
     global painter, size_board
     painter.clear()
 
     # Đổ nền cho Menu
     painter.goto(0, 0)
-    painter.color("#2c3e50", "#eceff1")
+    painter.color("#2c3e50", "#f4f6f7")
     painter.begin_fill()
     painter.goto(size_board, 0)
     painter.goto(size_board, size_board)
@@ -38,25 +39,26 @@ def draw_menu():
     # Tiêu đề game
     painter.goto(size_board / 2, 2.5)
     painter.color("#2c3e50")
-    painter.write("GAME CARO", align="center", font=("Arial", 24, "bold"))
-    painter.goto(size_board / 2, 3.5)
+    painter.write("GAME CARO XO", align="center", font=("Arial", 26, "bold"))
+    painter.goto(size_board / 2, 3.8)
     painter.write("Chọn chế độ chơi để bắt đầu", align="center", font=("Arial", 12, "italic"))
 
-    # Vẽ 3 nút bấm tương ứng với 3 chế độ
-    draw_button(painter, 3, 5.0, 12, 6.5, "1. Người vs Người (PvP)", "#34495e")
-    draw_button(painter, 3, 7.5, 12, 9.0, "2. Người vs AI (PvAI)", "#16a085")
-    draw_button(painter, 3, 10.0, 12, 11.5, "3. AI vs AI (Xem máy đấu)", "#2980b9")
+    # Vẽ các nút bấm menu
+    draw_button(painter, 3, 5.5, 12, 7.0, "1. Người với Người", "#34495e")
+    draw_button(painter, 3, 8.0, 12, 9.5, "2. Người với AI", "#16a085")
+    draw_button(painter, 3, 10.5, 12, 12.0, "3. AI với AI", "#2980b9")
 
     screen.update()
 
-
+# Khi chọn chế độ xong thì xóa menu và hiện bàn cờ
 def start_game():
-    """Xóa Menu và khởi tạo vẽ bàn cờ Caro"""
+
     global in_menu, painter, size_board, game_mode, screen
     in_menu = False
     painter.clear()
 
-    bg_color = "#d7ccc8"  # Màu bàn cờ gỗ thanh lịch
+    bg_color = "#fafafa"
+    # vẽ bàn cờ
     for r in range(size_board):
         for c in range(size_board):
             painter.goto(c, r + 1)
@@ -69,33 +71,35 @@ def start_game():
 
 
 def click(x, y):
-    """Bộ xử lý trung tâm khi người dùng click chuột"""
+    # khai báo các biến cục bộ để có thể đọc và ghi đè
+    # kiểm tra nếu win thì sẽ dừng lại
     global board, colors, win, move_history, game_mode, turn, in_menu
     if win: return
 
-    # --- NẾU ĐANG Ở MÀN HÌNH MENU ---
+    # nếu ở menu thì sẽ chọn chế độ chơi
     if in_menu:
         if 3 <= x <= 12:
-            if 5.0 <= y <= 6.5:
+            if 5.5 <= y <= 7.0:
                 game_mode = 1
                 start_game()
-            elif 7.5 <= y <= 9.0:
+            elif 8.0 <= y <= 9.5:
                 game_mode = 2
                 start_game()
-            elif 10.0 <= y <= 11.5:
+            elif 10.5 <= y <= 12.0:
                 game_mode = 3
                 start_game()
         return
 
-    # --- NẾU ĐANG TRONG TRẬN ĐẤU ---
+   # nếu ở trong trận đấu
+   # kiểm tra xem click có ra ngoài không
     ix, iy = int(x), int(y)
     if not is_in(board, iy, ix):
         return
-
+    # nếu ô click còn trống thì xử lí tiếp còn không thì dừng
     if board[iy][ix] == ' ':
-        # CHẾ ĐỘ 1: NGƯỜI VS NGƯỜI
+        # người với vời
         if game_mode == 1:
-            draw_stone(ix, iy, colors[turn])
+            draw_stone(ix, iy, turn)
             board[iy][ix] = turn
             move_history.append((ix, iy))
 
@@ -106,9 +110,9 @@ def click(x, y):
                 return
             turn = 'w' if turn == 'b' else 'b'
 
-        # CHẾ ĐỘ 2: NGƯỜI VS AI
+        # người với ai
         elif game_mode == 2:
-            draw_stone(ix, iy, colors['b'])
+            draw_stone(ix, iy, 'b')
             board[iy][ix] = 'b'
             move_history.append((ix, iy))
 
@@ -118,7 +122,7 @@ def click(x, y):
                 return
 
             ay, ax = best_move(board, 'w')
-            draw_stone(ax, ay, colors['w'])
+            draw_stone(ax, ay, 'w')
             board[ay][ax] = 'w'
             move_history.append((ax, ay))
 
@@ -129,12 +133,12 @@ def click(x, y):
 
 
 def ai_vs_ai_loop():
-    """Vòng lặp tự động chạy dành riêng cho CHẾ ĐỘ 3: AI VS AI"""
+
     global board, colors, win, move_history, turn, screen
     if win: return
 
     ay, ax = best_move(board, turn)
-    draw_stone(ax, ay, colors[turn])
+    draw_stone(ax, ay, turn)
     board[ay][ax] = turn
     move_history.append((ax, ay))
 
@@ -145,17 +149,16 @@ def ai_vs_ai_loop():
         return
 
     turn = 'w' if turn == 'b' else 'b'
-    screen.ontimer(ai_vs_ai_loop, 600)  # Mỗi nước đi của AI cách nhau 600ms để người xem kịp theo dõi
+    screen.ontimer(ai_vs_ai_loop, 600)
 
-
+# vẽ 1 ô vuông
 def draw_square(t, size, fill_color):
-    t.color("#2c3e50", fill_color)
+    t.color("#b2bec3", fill_color)
+    t.pensize(1)
     t.pendown()
-    t.begin_fill()
     for _ in range(4):
         t.forward(size)
         t.left(90)
-    t.end_fill()
     t.penup()
 
 
@@ -166,10 +169,11 @@ def initialize(size):
     move_history = []
     win = False
     in_menu = True
-    turn = 'b'
+    turn = 'b'  # 'b' sẽ đại diện cho X (đi trước), 'w' đại diện cho O
     board = make_empty_board(size)
 
     screen = turtle.Screen()
+    screen.title("Caro")
     screen.setup(650, 650)
     screen.setworldcoordinates(0, size, size, 0)
     screen.tracer(0)
@@ -179,9 +183,16 @@ def initialize(size):
     painter.penup()
     painter.ht()
 
-    colors = {'w': turtle.Turtle(), 'b': turtle.Turtle()}
-    colors['w'].color('#bdc3c7', '#ffffff')
-    colors['b'].color('#1a1a1a', '#1a1a1a')
+    # Tạo 2 bút vẽ riêng biệt cho X và O để nét vẽ mượt mà, không bị lẫn màu
+    colors = {'b': turtle.Turtle(), 'w': turtle.Turtle()}
+
+    # Thiết lập cho quân X (b) - Màu xanh lam Modern
+    colors['b'].color('#2980b9')
+    colors['b'].pensize(3)
+
+    # Thiết lập cho quân O (w) - Màu đỏ cam Coral
+    colors['w'].color('#e74c3c')
+    colors['w'].pensize(3)
 
     for key in colors:
         colors[key].ht()
@@ -195,16 +206,45 @@ def initialize(size):
     screen.listen()
     screen.mainloop()
 
+# vẽ kí tự o x và căn giữ ô vuông
+def draw_stone(x, y, player_turn):
 
-def draw_stone(x, y, colturtle):
-    r = 0.38
-    colturtle.goto(x + 0.5, y + 0.5 - r)
-    colturtle.setheading(0)
-    colturtle.pendown()
-    colturtle.begin_fill()
-    colturtle.circle(r)
-    colturtle.end_fill()
-    colturtle.penup()
+    t = colors[player_turn]
+
+    # Tâm thực tế của ô cờ
+    center_x = x + 0.5
+    center_y = y + 0.5
+
+    if player_turn == 'b':
+        # --- VẼ QUÂN X ---
+        size = 0.25  # Độ nửa chiều rộng của chữ X
+
+        # Nét chéo 1: Trên-Trái xuống Dưới-Phải
+        t.penup()
+        t.goto(center_x - size, center_y - size)
+        t.pendown()
+        t.goto(center_x + size, center_y + size)
+
+        # Nét chéo 2: Dưới-Trái lên Trên-Phải
+        t.penup()
+        t.goto(center_x - size, center_y + size)
+        t.pendown()
+        t.goto(center_x + size, center_y - size)
+        t.penup()
+
+    else:
+        # --- VẼ QUÂN O ---
+        r = 0.25  # Bán kính đường tròn
+
+        t.penup()
+        # Trong hệ tọa độ đảo của bạn, để đường tròn tâm (center_x, center_y),
+        # ta phải đưa rùa về vị trí đỉnh phía trên của đường tròn (center_y - r)
+        t.goto(center_x, center_y - r)
+        t.setheading(0)
+        t.pendown()
+        t.circle(r)
+        t.penup()
+
     screen.update()
 
 
