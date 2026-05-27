@@ -1,235 +1,138 @@
 
-global move_history, game_mode, turn, in_menu, painter, size_board
-
-
+#  tạo bàn cờ sz x sz
 def make_empty_board(sz):
-    board = []
-    for i in range(sz):
-        board.append([" "] * sz)
-    return board
+    return [[" "] * sz for _ in range(sz)]
 
-
-def is_empty(board):
-    for row in board:
-        if any(cell != ' ' for cell in row):
-            return False
-    return True
-
-
+# kiểm tra tọa độ
 def is_in(board, y, x):
     return 0 <= y < len(board) and 0 <= x < len(board)
 
 
-def is_win(board):
-    black = score_of_col(board, 'b')
-    white = score_of_col(board, 'w')
-    sum_sumcol_values(black)
-    sum_sumcol_values(white)
-    if 5 in black and black[5] == 1:
-        return 'Black won'
-    elif 5 in white and white[5] == 1:
-        return 'White won'
-    if possible_moves(board) == []:
-        return 'Draw'
-    return 'Continue playing'
+def evaluate_line_fixed(board, y, x, dy, dx, player):
+    #Từ ô (y,x), đi về phía trước và phía sau theo hướng (dy,dx) để đếm quân
+    count_player = 1
+    open_ends = 0
+
+    # 1. Tiến về phía trước
+    i = 1
+    while is_in(board, y + i * dy, x + i * dx) and board[y + i * dy][x + i * dx] == player:
+        count_player += 1
+        i += 1
+    # Kiểm tra đầu phía trước có trống không
+    if is_in(board, y + i * dy, x + i * dx) and board[y + i * dy][x + i * dx] == ' ':
+        open_ends += 1
+
+    # 2. Lùi về phía sau
+    i = 1
+    while is_in(board, y - i * dy, x - i * dx) and board[y - i * dy][x - i * dx] == player:
+        count_player += 1
+        i += 1
+    # Kiểm tra đầu phía sau có trống không
+    if is_in(board, y - i * dy, x - i * dx) and board[y - i * dy][x - i * dx] == ' ':
+        open_ends += 1
+
+    # Trả về điểm số dựa trên độ mạnh của chuỗi theo hướng này
+    if count_player >= 5: return 1000000  # Thắng luôn
+    if count_player == 4:
+        return 50000 if open_ends > 0 else 5000  # 4 quân thoáng đầu vs bị chặn 1 đầu
+    if count_player == 3:
+        return 8000 if open_ends == 2 else 800  # 3 quân thoáng 2 đầu cực nguy hiểm
+    if count_player == 2:
+        return 500 if open_ends == 2 else 50
+    return 10
 
 
+def evaluate_move(board, y, x, player):
+    # Hàm chấm điểm
+    opponent = 'w' if player == 'b' else 'b'
+    directions = [(0, 1), (1, 0), (1, 1), (-1, 1)]
 
-def march(board, y, x, dy, dx, length):
-    curr_y, curr_x = y, x
-    for _ in range(length):
-        next_y = curr_y + dy
-        next_x = curr_x + dx
-        if is_in(board, next_y, next_x):
-            curr_y, curr_x = next_y, next_x
-        else:
-            break
-    return curr_y, curr_x
+    board[y][x] = player  # Đánh thử
+
+    total_attack = 0
+    total_defense = 0
+
+    for dy, dx in directions:
+        # Tính xem nếu ta đánh vào đây thì hướng này được bao nhiêu điểm
+        total_attack += evaluate_line_fixed(board, y, x, dy, dx, player)
+        # Tính xem nếu ĐỊCH đánh vào đây thì hướng này mạnh thế nào (để ta đi chặn)
+        total_defense += evaluate_line_fixed(board, y, x, dy, dx, opponent)
+
+    board[y][x] = ' '  # Trả lại ô trống
+
+    # Cộng điểm Tấn công + Phòng thủ (nhân hệ số chặn địch cao hơn một chút để AI khôn hơn)
+    return total_attack + int(total_defense * 1.3)
+# 5. TÌM CÁC NƯỚC ĐI TIỀM NĂNG (Xung quanh các quân đã đánh trong bán kính 2 ô)
+def get_possible_moves(board):
+    size = len(board)
+    moves = set()
+    has_pieces = False
+
+    for y in range(size):
+        for x in range(size):
+            if board[y][x] != ' ':
+                has_pieces = True
+                # Lấy các ô trống xung quanh ô đã đánh
+                for dy in range(-2, 3):
+                    for dx in range(-2, 3):
+                        ny, nx = y + dy, x + dx
+                        if is_in(board, ny, nx) and board[ny][nx] == ' ':
+                            moves.add((ny, nx))
+
+    # Nếu bàn cờ trống, chọn ngay ô chính giữa
+    if not has_pieces:
+        return [(size // 2, size // 2)]
+
+    return list(moves)
 
 
-def score_ready(scorecol):
-    sumcol = {0: {}, 1: {}, 2: {}, 3: {}, 4: {}, 5: {}, -1: {}}
-    for key in scorecol:
-        for score in scorecol[key]:
-            if key in sumcol[score]:
-                sumcol[score][key] += 1
-            else:
-                sumcol[score][key] = 1
-    return sumcol
+# 6. KIỂM TRA XEM AI THẮNG
+def check_winner(board):
+    size = len(board)
+    directions = [(0, 1), (1, 0), (1, 1), (-1, 1)]
+
+    for y in range(size):
+        for x in range(size):
+            if board[y][x] != ' ':
+                player = board[y][x]
+                for dy, dx in directions:
+                    # Kiểm tra xem có đủ 5 quân liên tiếp cùng màu không
+                    if all(is_in(board, y + i * dy, x + i * dx) and board[y + i * dy][x + i * dx] == player for i in
+                           range(5)):
+                        return f"{player} won"
+
+    if not get_possible_moves(board):
+        return "Draw"
+    return "Continue"
 
 
-def sum_sumcol_values(sumcol):
-    for key in sumcol:
-        if key == 5:
-            sumcol[5] = int(1 in sumcol[5].values())
-        else:
-            sumcol[key] = sum(sumcol[key].values())
-
-
-def score_of_list(lis, col):
-    blank = lis.count(' ')
-    filled = lis.count(col)
-    if blank + filled < 5:
-        return -1
-    elif blank == 5:
+# 7. THUẬT TOÁN MINIMAX KẾT HỢP CẮT TỈA ALPHA-BETA
+def minimax(board, depth, alpha, beta, is_maximizing, player):
+    winner = check_winner(board)
+    if winner != "Continue" or depth == 0:
+        if winner == f"{player} won":
+            return 100000 + depth
+        elif "won" in winner:
+            return -100000 - depth  # Đối thủ thắng
+        elif winner == "Draw":
+            return 0
         return 0
-    else:
-        return filled
 
+    opponent = 'w' if player == 'b' else 'b'
+    current_player = player if is_maximizing else opponent
 
-def row_to_list(board, y, x, dy, dx, yf, xf):
-    row = []
-    curr_y, curr_x = y, x
-    while is_in(board, curr_y, curr_x):
-        row.append(board[curr_y][curr_x])
-        if curr_y == yf and curr_x == xf:
-            break
-        curr_y += dy
-        curr_x += dx
-    return row
+    moves = get_possible_moves(board)
+    # Sắp xếp các nước đi có điểm cao lên trước để cắt tỉa Alpha-Beta hiệu quả hơn
+    moves.sort(key=lambda m: evaluate_move(board, m[0], m[1], current_player), reverse=True)
 
-
-def score_of_row(board, cordi, dy, dx, cordf, col):
-    y, x = cordi
-    yf, xf = cordf
-    row = row_to_list(board, y, x, dy, dx, yf, xf)
-    colscores = []
-    for start in range(len(row) - 4):
-        score = score_of_list(row[start:start + 5], col)
-        colscores.append(score)
-    return colscores
-
-
-def score_of_col(board, col):
-    f = len(board)
-    scores = {(0, 1): [], (-1, 1): [], (1, 0): [], (1, 1): []}
-    for start in range(len(board)):
-        scores[(0, 1)].extend(score_of_row(board, (start, 0), 0, 1, (start, f - 1), col))
-        scores[(1, 0)].extend(score_of_row(board, (0, start), 1, 0, (f - 1, start), col))
-        scores[(1, 1)].extend(score_of_row(board, (start, 0), 1, 1, (f - 1, f - 1 - start), col))
-        scores[(-1, 1)].extend(score_of_row(board, (start, 0), -1, 1, (0, start), col))
-        if start + 1 < len(board):
-            scores[(1, 1)].extend(score_of_row(board, (0, start + 1), 1, 1, (f - 2 - start, f - 1), col))
-            scores[(-1, 1)].extend(score_of_row(board, (f - 1, start + 1), -1, 1, (start + 1, f - 1), col))
-    return score_ready(scores)
-
-
-def score_of_col_one(board, col, y, x):
-    scores = {(0, 1): [], (-1, 1): [], (1, 0): [], (1, 1): []}
-    scores[(0, 1)].extend(score_of_row(board, march(board, y, x, 0, -1, 4), 0, 1, march(board, y, x, 0, 1, 4), col))
-    scores[(1, 0)].extend(score_of_row(board, march(board, y, x, -1, 0, 4), 1, 0, march(board, y, x, 1, 0, 4), col))
-    scores[(1, 1)].extend(score_of_row(board, march(board, y, x, -1, -1, 4), 1, 1, march(board, y, x, 1, 1, 4), col))
-    scores[(-1, 1)].extend(score_of_row(board, march(board, y, x, -1, 1, 4), 1, -1, march(board, y, x, 1, -1, 4), col))
-    return score_ready(scores)
-
-
-def possible_moves(board):
-    taken = []
-    directions = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (-1, -1), (-1, 1), (1, -1)]
-    cord = {}
-    for i in range(len(board)):
-        for j in range(len(board)):
-            if board[i][j] != ' ':
-                taken.append((i, j))
-    if not taken:
-        return {(len(board) // 2, len(board) // 2): False}
-
-    for direction in directions:
-        dy, dx = direction
-        for coord in taken:
-            y, x = coord
-            for length in [1, 2]:
-                move = march(board, y, x, dy, dx, length)
-                if board[move[0]][move[1]] == ' ' and move not in cord:
-                    cord[move] = False
-    return cord
-
-
-def TF34score(score3, score4):
-    for key4 in score4:
-        if score4[key4] >= 1:
-            for key3 in score3:
-                if key3 != key4 and score3[key3] >= 2:
-                    return True
-    return False
-
-
-def stupid_score(board, col, anticol, y, x):
-    M = 1000
-    res, adv, dis = 0, 0, 0
-    board[y][x] = col
-    sumcol = score_of_col_one(board, col, y, x)
-    a = winning_situation(sumcol)
-    adv += a * M
-    sum_sumcol_values(sumcol)
-    adv += sumcol[-1] + sumcol[1] + 4 * sumcol[2] + 8 * sumcol[3] + 16 * sumcol[4]
-
-    board[y][x] = anticol
-    sumanticol = score_of_col_one(board, anticol, y, x)
-    d = winning_situation(sumanticol)
-    dis += d * (M - 100)
-    sum_sumcol_values(sumanticol)
-    dis += sumanticol[-1] + sumanticol[1] + 4 * sumanticol[2] + 8 * sumanticol[3] + 16 * sumanticol[4]
-    res = adv + dis
-    board[y][x] = ' '
-    return res
-
-
-def winning_situation(sumcol):
-    if 1 in sumcol[5].values():
-        return 5
-    elif len(sumcol[4]) >= 2 or (len(sumcol[4]) >= 1 and max(sumcol[4].values()) >= 2):
-        return 4
-    elif TF34score(sumcol[3], sumcol[4]):
-        return 4
-    else:
-        score3 = sorted(sumcol[3].values(), reverse=True)
-        if len(score3) >= 2 and score3[0] >= score3[1] >= 2: return 3
-    return 0
-
-
-def evaluate_board(board, col):
-    anticol = 'b' if col == 'w' else 'w'
-    total_score = 0
-    for y in range(len(board)):
-        for x in range(len(board)):
-            if board[y][x] == col:
-                sumcol = score_of_col_one(board, col, y, x)
-                sum_sumcol_values(sumcol)
-                total_score += sumcol[-1] + sumcol[1] + 4 * sumcol[2] + 8 * sumcol[3] + 16 * sumcol[4]
-            elif board[y][x] == anticol:
-                sumanticol = score_of_col_one(board, anticol, y, x)
-                sum_sumcol_values(sumanticol)
-                total_score -= (
-                        sumanticol[-1] + sumanticol[1] + 4 * sumanticol[2] + 8 * sumanticol[3] + 16 * sumanticol[4])
-    return total_score
-
-
-def minimax(board, depth, alpha, beta, is_maximizing, col):
-    anticol = 'b' if col == 'w' else 'w'
-    game_res = is_win(board)
-
-    if depth == 0 or game_res != 'Continue playing':
-        if game_res == 'White won': return (100000 + depth) if col == 'w' else (-100000 - depth)
-        if game_res == 'Black won': return (-100000 - depth) if col == 'w' else (100000 + depth)
-        if game_res == 'Draw': return 0
-        return evaluate_board(board, col)
-
-    all_moves = possible_moves(board)
-    ranked_moves = []
-    for move in all_moves:
-        y, x = move
-        score = stupid_score(board, col if is_maximizing else anticol, anticol if is_maximizing else col, y, x)
-        ranked_moves.append((score, move))
-    ranked_moves.sort(key=lambda x: x[0], reverse=True)
-    best_moves = [move for score, move in ranked_moves[:4]]
+    # Giới hạn chỉ duyệt 4 nước đi tốt nhất để không bị chậm máy
+    best_moves = moves[:4]
 
     if is_maximizing:
         max_eval = -float('inf')
-        for move in best_moves:
-            y, x = move
-            board[y][x] = col
-            evaluation = minimax(board, depth - 1, alpha, beta, False, col)
+        for y, x in best_moves:
+            board[y][x] = player
+            evaluation = minimax(board, depth - 1, alpha, beta, False, player)
             board[y][x] = ' '
             max_eval = max(max_eval, evaluation)
             alpha = max(alpha, evaluation)
@@ -238,10 +141,9 @@ def minimax(board, depth, alpha, beta, is_maximizing, col):
         return max_eval
     else:
         min_eval = float('inf')
-        for move in best_moves:
-            y, x = move
-            board[y][x] = anticol
-            evaluation = minimax(board, depth - 1, alpha, beta, True, col)
+        for y, x in best_moves:
+            board[y][x] = opponent
+            evaluation = minimax(board, depth - 1, alpha, beta, True, player)
             board[y][x] = ' '
             min_eval = min(min_eval, evaluation)
             beta = min(beta, evaluation)
@@ -250,33 +152,26 @@ def minimax(board, depth, alpha, beta, is_maximizing, col):
         return min_eval
 
 
-def best_move(board, col):
-    if is_empty(board):
-        return (len(board) // 2, len(board) // 2)
+def get_best_move(board, player):
+    moves = get_possible_moves(board)
+    if len(moves) == 1:  # Nước đi đầu tiên vào giữa bàn cờ
+        return moves[0]
 
-    moves = possible_moves(board)
     best_val = -float('inf')
-    movecol = None
+    best_move = None
 
-    anticol = 'b' if col == 'w' else 'w'
-    ranked_moves = []
-    for move in moves:
-        y, x = move
-        score = stupid_score(board, col, anticol, y, x)
-        ranked_moves.append((score, move))
-    ranked_moves.sort(key=lambda x: x[0], reverse=True)
+    # Lấy ra 6 nước đi tốt nhất dựa trên chấm điểm nhanh để đưa vào Minimax sâu hơn
+    moves.sort(key=lambda m: evaluate_move(board, m[0], m[1], player), reverse=True)
+    candidates = moves[:6]
 
-    top_candidates = ranked_moves[:6]
-    depth = 2
-
-    for score, move in top_candidates:
-        y, x = move
-        board[y][x] = col
-        move_val = minimax(board, depth - 1, -float('inf'), float('inf'), False, col)
+    for y, x in candidates:
+        board[y][x] = player
+        # Gọi Minimax với độ sâu là 4 lượt đi tiếp theo
+        move_val = minimax(board, 4, -float('inf'), float('inf'), False, player)
         board[y][x] = ' '
 
         if move_val > best_val:
             best_val = move_val
-            movecol = move
+            best_move = (y, x)
 
-    return movecol
+    return best_move
