@@ -370,7 +370,7 @@ def initialize(size):
     board = make_empty_board(size)  # Tạo một ma trận 2 chiều rỗng cỡ 15x15 chứa toàn ký tự trống ' '
 
     screen = turtle.Screen()
-    screen.title("Gomoku Caro AI - Phiên bản Mới")
+    screen.title("Cờ Caro AI")
     screen.setup(650, 700)  # Thiết lập kích thước cửa sổ: Rộng 650 pixel, Cao 700 pixel
 
     # Lệnh này định nghĩa: Góc TRÊN - TRÁI màn hình là gốc (0, 0)
