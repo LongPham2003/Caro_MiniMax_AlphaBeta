@@ -50,10 +50,10 @@ def evaluate_move(board, y, x, player):
     # Nếu AI đang giữ quân Đen ('b'), đối thủ sẽ là quân Trắng ('w') và ngược lại
     opponent = 'w' if player == 'b' else 'b'
     directions = [
-        (0, 1),  # trục ngang (Không đổi dòng, tăng cột)
-        (1, 0),  # trục dọc (Tăng dòng, không đổi cột)
-        (1, 1),  # Đường Chéo Xuôi (Chạy từ trên-trái xuống dưới-phải)
-        (-1, 1)  # Đường Chéo Ngược (Chạy từ dưới-trái lên trên-phải)
+        (0, 1),  # Ngang
+        (1, 0),  # dọc
+        (1, 1),  # Đường Chéo xuống(Chạy từ trên-trái xuống dưới-phải)
+        (-1, 1)  # Đường Chéo lên (Chạy từ dưới-trái lên trên-phải)
     ]
 
     board[y][x] = player  # Đánh thử để tính điểm
